@@ -4,6 +4,8 @@ from fastai.text.core import WordTokenizer, Tokenizer, SentencePieceTokenizer
 import pandas as pd
 from fastcore.foundation import first, coll_repr, L
 
+CUDA_VISIBLE_DEVICES=""
+
 print(URLs.LOCAL_PATH)
 print(URLs.WIKITEXT_TINY)
 
