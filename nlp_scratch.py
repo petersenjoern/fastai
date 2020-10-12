@@ -560,14 +560,15 @@ if __name__ == "__main__":
     # print(df_train.iloc[-1].values)
 
     txt = df_all.iloc[-1].values[0][:200]
+    txt = L([i for i in df_all])
     print(txt)
 
-    spacy = WordTokenizer()
-    toks = first(spacy([txt]))
-    print(toks)
+    # spacy = WordTokenizer()
+    # toks = first(spacy([txt]))
+    # print(toks)
 
-    toks=Tokenizer.from_df(0)
-    print(toks)
+    # toks=Tokenizer.from_df(0)
+    # print(toks)
 
 
 
