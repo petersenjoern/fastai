@@ -7,6 +7,7 @@ from fastai.text.learner import language_model_learner
 from fastai.text.models.awdlstm import AWD_LSTM
 from fastcore.foundation import first, coll_repr, L
 from fastai.metrics import Perplexity, accuracy
+from fastai.callback.tensorboard import TensorBoardCallback
 import pandas as pd
 
 if __name__ == '__main__':
@@ -62,9 +63,13 @@ if __name__ == '__main__':
     dls_lm = dls_lm.dataloaders(df_all, bs=64, seq_len=72)
     print(dls_lm.show_batch(max_n=3))
 
+
     learn = language_model_learner(
         dls_lm, AWD_LSTM,
         metrics=[accuracy, Perplexity()]).to_fp16()
     print(learn.model)
+
+    print(learn.lr_find())
+    learn.fine_tune(1, 1e-2, cbd=cbs=TensorBoardCallback(Path.home()/'tmp'/'runs'/'tb', trace_model=True))
 
 

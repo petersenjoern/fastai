@@ -4,6 +4,7 @@ token
 docs/
 conda/
 tmp/
+runs/
 
 tags
 *~
