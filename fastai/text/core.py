@@ -161,7 +161,8 @@ def _tokenize_files(func, files, path, output_dir=None, output_names=None, n_wor
     if skip_if_exists and output_dir.exists(): return output_dir
     output_dir.mkdir(exist_ok=True)
     if output_names is None: output_names = L(output_dir/f.relative_to(path) for f in files)
-    rules = partial(Path.read, encoding=encoding) + L(ifnone(rules, defaults.text_proc_rules.copy()))
+    # rules = partial(Path.read, encoding=encoding) + L(ifnone(rules, defaults.text_proc_rules.copy()))
+    rules = partial(Path.readlines, encoding=encoding) + L(ifnone(rules, defaults.text_proc_rules.copy()))
 
     lengths,counter = {},Counter()
     for i,tok in parallel_tokenize(files, tok, rules, n_workers=n_workers):
@@ -275,8 +276,13 @@ class Tokenizer(Transform):
         path = Path(path)
         if tok is None: tok = WordTokenizer()
         output_dir = tokenize_folder(path, tok=tok, rules=rules, **kwargs)
-        res = cls(tok, counter=(output_dir/fn_counter_pkl).load(),
-                  lengths=(output_dir/fn_lengths_pkl).load(), rules=rules, mode='folder')
+        if os.name == "nt":
+            res = cls(tok, counter=load_pickle((output_dir/fn_counter_pkl)),
+                length=load_pickle((output_dir/fn_length_pkl)),
+                rules=rules, mode='folder')
+        else:
+            res = cls(tok, counter=(output_dir/fn_counter_pkl).load(),
+                      lengths=(output_dir/fn_lengths_pkl).load(), rules=rules, mode='folder')
         res.path,res.output_dir = path,output_dir
         return res
 
