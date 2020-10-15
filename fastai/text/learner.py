@@ -109,10 +109,7 @@ class TextLearner(Learner):
 
     def load_pretrained(self, wgts_fname, vocab_fname, model=None):
         "Load a pretrained model and adapt it to the data vocabulary."
-        if os.name == "nt":
-            old_vocab = load_pickle(Path(vocab_fname))
-        else:
-            old_vocab = Path(vocab_fname).load()
+        old_vocab = load_pickle(vocab_fname)
         new_vocab = _get_text_vocab(self.dls)
         distrib_barrier()
         wgts = torch.load(wgts_fname, map_location = lambda storage,loc: storage)
