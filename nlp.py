@@ -10,6 +10,7 @@ from fastai.callback.tensorboard import TensorBoardCallback
 from fastai.callback.schedule import fine_tune, lr_find
 from fastcore.foundation import first, coll_repr, L
 from fastcore.utils import partialler
+from functools import partial
 
 import pandas as pd
 import pathlib
@@ -79,10 +80,10 @@ if __name__ == '__main__':
     # Prepare IMDB data
     path = untar_data(URLs.IMDB)
 
-    get_imdb = partialler(get_text_files, folders=["train", "test", "unsup"])
+    get_imdb = partial(get_text_files, folders=["train", "test", "unsup"])
 
     dls_lm = DataBlock(
         blocks=TextBlock.from_folder(path, is_lm=True),
         get_items=get_imdb,
         splitter=RandomSplitter(0.1)
-    ).dataloaders(path=path, bs=64, seq_len=80)
+    ).dataloaders(path, path=path, bs=64, seq_len=80)
