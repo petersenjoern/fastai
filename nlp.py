@@ -1,13 +1,14 @@
+#%%
 from fastai.data.external import URLs, untar_data
-from fastai.data.transforms import get_files, get_text_files, ColReader, RandomSplitter
+from fastai.data.transforms import get_files, get_text_files, ColReader, RandomSplitter, parent_label,GrandparentSplitter
 from fastai.data.block import DataBlock
 from fastai.text.core import WordTokenizer, Tokenizer, SentencePieceTokenizer
-from fastai.text.data import Numericalize, TextBlock
-from fastai.text.learner import language_model_learner
+from fastai.text.data import Numericalize, TextBlock, CategoryBlock
+from fastai.text.learner import language_model_learner, text_classifier_learner
 from fastai.text.models.awdlstm import AWD_LSTM
 from fastai.metrics import Perplexity, accuracy
 from fastai.callback.tensorboard import TensorBoardCallback
-from fastai.callback.schedule import fine_tune, lr_find
+from fastai.callback.schedule import fine_tune, lr_find, fit_one_cycle
 from fastcore.foundation import first, coll_repr, L
 from fastcore.utils import partialler
 from functools import partial
@@ -15,12 +16,14 @@ from functools import partial
 import pandas as pd
 import pathlib
 
-PATH_TENSORBOARD=URLs.LOCAL_PATH.joinpath('tmp','runs')
+#%%
 
+
+#%%
 if __name__ == '__main__':
+    PATH_TENSORBOARD=URLs.LOCAL_PATH.joinpath('tmp','runs')
     print(PATH_TENSORBOARD)
-
-
+    cbs=TensorBoardCallback(PATH_TENSORBOARD, trace_model=False) # Trace has to be false, because of mixed precision (FP16)
 
     # Prepare data for wikitext
     # path = untar_data(URLs.WIKITEXT_TINY)
@@ -77,13 +80,92 @@ if __name__ == '__main__':
     # print(learn.lr_find())
     # learn.fine_tune(5, 1e-2, cbd=TensorBoardCallback(PATH_TENSORBOARD, trace_model=True))
 
+    #%%
     # Prepare IMDB data
     path = untar_data(URLs.IMDB)
+    bs=32
 
+    # Fine-tune pretrained language model (based on wikitext) to the IMDB corpus
     get_imdb = partial(get_text_files, folders=["train", "test", "unsup"])
-
     dls_lm = DataBlock(
-        blocks=TextBlock.from_folder(path, is_lm=True),
+        blocks=TextBlock.from_folder(path, is_lm=True, n_workers=4),
         get_items=get_imdb,
         splitter=RandomSplitter(0.1)
-    ).dataloaders(path, path=path, bs=64, seq_len=80)
+    )
+    dls_lm = dls_lm.dataloaders(path, path=path, bs=bs, seq_len=80)
+    print(dls_lm.show_batch(max_n=3))
+
+# #%%
+    # learn = language_model_learner(
+    #     dls_lm, AWD_LSTM, drop_mult=0.3,
+    #     metrics=[accuracy, Perplexity()]).to_fp16()
+    # learn.lr_find()
+    # print(learn.model)
+    # learn.fit_one_cycle(1, 2e-2, moms=(0.8,0.7,0.8), cbs=cbs)
+    # learn.save("1epoch")
+
+# #%%
+    learn = language_model_learner(
+        dls_lm, AWD_LSTM, drop_mult=0.3,
+        metrics=[accuracy, Perplexity()]).to_fp16()
+    learn = learn.load("1epoch")
+    print(learn.model)
+# #%%
+
+    # learn.unfreeze()
+    # learn.fit_one_cycle(1, 2e-3, moms=(0.8,0.7,0.8), cbs=cbs)
+    # learn.save("5epochs")
+    # learn.save_encoder("finetuned")
+
+
+
+# #%%
+#     # Classification
+#     # learn = learn.load("5epochs")
+#     # print(dls_lm.vocab)
+    def read_tokenized_file(f): return L(f.read_text().split(' '))
+    imdb_clas = DataBlock(
+                        blocks=(TextBlock.from_folder(path, vocab=dls_lm.vocab, n_workers=0),CategoryBlock()),
+                        get_x=read_tokenized_file,
+                        get_y = parent_label,
+                        get_items=partial(get_text_files, folders=['train', 'test']),
+                        splitter=GrandparentSplitter(valid_name='test'))
+
+    dbunch_clas = imdb_clas.dataloaders(path, path=path, bs=bs, seq_len=80)
+
+    print(dbunch_clas.show_batch(max_n=7))
+
+# #%%
+
+    learn = text_classifier_learner(
+        dbunch_clas,
+        AWD_LSTM,
+        drop_mult=0.5,
+        n_workers=0,
+        metrics=accuracy).to_fp16()
+
+    learn = learn.load_encoder("finetuned")
+    learn.lr_find()
+
+#     #%%
+    learn.fit_one_cycle(1, 2e-2, moms=(0.8,0.7, 0.8))
+    learn.save('first')
+    learn.load('first')
+
+# # %%
+    learn.freeze_to(-2)
+    learn.fit_one_cycle(1, slice(1e-2/(2.6**4),1e-2), moms=(0.8,0.7, 0.8))
+    learn.save('second')
+    learn.load('second')
+
+# #%%
+    learn.freeze_to(-3)
+    learn.fit_one_cycle(1, slice(5e-3/(2.6**4),5e-3),moms=(0.8,0.7, 0.8))
+    learn.save('third')
+    learn.load('third')
+
+# #%%
+    learn.unfreeze()
+    learn.fit_one_cycle(2, slice(1e-3/(2.6**4),1e-3), moms=(0.8,0.7, 0.8))
+    learn.predict("I really loved that movie , it was awesome !")
+# #%%
