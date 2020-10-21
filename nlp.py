@@ -114,51 +114,46 @@ if __name__ == '__main__':
 
     # learn.unfreeze()
     # learn.fit_one_cycle(1, 2e-3, moms=(0.8,0.7,0.8), cbs=cbs)
-    # learn.save("5epochs")
+    # learn.save("1epochs_finetuned")
     # learn.save_encoder("finetuned")
 
 
 
 # #%%
 #     # Classification
-#     # learn = learn.load("5epochs")
-#     # print(dls_lm.vocab)
     def read_tokenized_file(f): return L(f.read_text().split(' '))
     imdb_clas = DataBlock(
-                        blocks=(TextBlock.from_folder(path, vocab=dls_lm.vocab, n_workers=0),CategoryBlock()),
+                        blocks=(TextBlock.from_folder(path, vocab=dls_lm.vocab),CategoryBlock()),
                         get_x=read_tokenized_file,
                         get_y = parent_label,
                         get_items=partial(get_text_files, folders=['train', 'test']),
                         splitter=GrandparentSplitter(valid_name='test'))
 
     dbunch_clas = imdb_clas.dataloaders(path, path=path, bs=bs, seq_len=80)
-
     print(dbunch_clas.show_batch(max_n=7))
-
 # #%%
 
     learn = text_classifier_learner(
         dbunch_clas,
         AWD_LSTM,
         drop_mult=0.5,
-        n_workers=0,
         metrics=accuracy).to_fp16()
 
     learn = learn.load_encoder("finetuned")
     learn.lr_find()
 
 #     #%%
-    learn.fit_one_cycle(1, 2e-2, moms=(0.8,0.7, 0.8))
-    learn.save('first')
-    learn.load('first')
+#     learn.fit_one_cycle(1, 2e-2, moms=(0.8,0.7, 0.8))
+#     learn.save('first')
+#     learn.load('first')
 
-# # %%
-    learn.freeze_to(-2)
-    learn.fit_one_cycle(1, slice(1e-2/(2.6**4),1e-2), moms=(0.8,0.7, 0.8))
-    learn.save('second')
+# # # %%
+#     learn.freeze_to(-2)
+#     learn.fit_one_cycle(1, slice(1e-2/(2.6**4),1e-2), moms=(0.8,0.7, 0.8))
+#     learn.save('second')
     learn.load('second')
 
-# #%%
+# # #%%
     learn.freeze_to(-3)
     learn.fit_one_cycle(1, slice(5e-3/(2.6**4),5e-3),moms=(0.8,0.7, 0.8))
     learn.save('third')
